@@ -17,15 +17,16 @@ import time
 
 level1 = {
     "planes": {
-        "1": {"hp": 1, "count": 1, "damage": 1, "rate": 0.05}
+        "1": {"hp": 1, "count": 1, "damage": 1, "rate": 0.05, "shoot_chance" : 0.001, "move_chance": 0.005}
+        #"1": {"hp": 1, "count": 3, "damage": 1, "rate": 0.05, "shoot_chance" : 0.01, "move_chance": 0.01}
         #"1": {"hp": 5, "count": 7, "damage": 1, "rate": 0.05},
         #"2": {"hp": 15, "count": 3, "damage": 1, "rate": 0.02},
     }
 }
 level2 = {
     "planes": {
-        "1": {"hp": 7, "count": 15, "damage": 1, "rate": 0.05},
-        "2": {"hp": 30, "count": 10, "damage": 5, "rate": 0.02},
+        "1": {"hp": 3, "count": 10, "damage": 1, "rate": 0.05, "shoot_chance" : 0.001, "move_chance": 0.005},
+        "2": {"hp": 10, "count": 3, "damage": 10, "rate": 0.02, "shoot_chance" : 0.05, "move_chance": 0.0001},
     }
 }
 levels = [level1, level2]
@@ -206,6 +207,8 @@ class Game:
         plane = EnemyPlane()
         plane.y = 0
         plane.x = random.randint(MIN_X, MAX_X)
+        plane.shoot_chance = plane_info["shoot_chance"]
+        plane.move_chance = plane_info["move_chance"]
 
         # Perform a duplicate check and fail spawn if plane already exists
         for check in self.enemy_planes:
@@ -290,6 +293,61 @@ class Game:
 
         self.player_plane.draw()
 
+    def check_enemy_moves(self):
+        for enemy in self.enemy_planes:
+            dice = random.uniform(0, 1)
+            if dice >= enemy.shoot_chance:
+                print("enemy shoots")
+                self.enemy_shoot(enemy)
+            if dice >= enemy.move_chance:
+                print("enemy moves")
+                self.enemy_move(enemy)
+
+    def enemy_shoot(self, enemy):
+        print("Enemy shot a missile")
+        missile = Missile()
+        missile.x = enemy.x
+        missile.y = enemy.y + 1
+        missile.damage = enemy.damage
+        missile.direction = DIRECTION_DOWN
+        self.missiles.append(missile)
+
+    def get_move_coords(self, plane, direction):
+        # Returns a tuple of coordinates (x, y)
+        if direction == DIRECTION_DOWN:
+            return plane.x, plane.y + 1
+        elif direction == DIRECTION_UP:
+            return plane.x, plane.y - 1
+        elif direction == DIRECTION_RIGHT:
+            return plane.x + 1, plane.y
+        elif direction == DIRECTION_LEFT:
+            return plane.x - 1, plane.y
+        else:
+            raise Exception("Unknown direction %s" % (direction,))
+
+    def enemy_move(self, enemy):
+        # Try to move the enemy 5 times, ignoring spots with other enemies
+        for t in range(5):
+            direction = random.randint(0, 3)
+            x, y = self.get_move_coords(enemy, direction)
+            if x < MIN_X or x > MAX_X or y < MIN_Y or y > MAX_Y:
+                continue
+
+            # Coords look valid, now do a dupe check for other enemies
+            dupe = False
+            for e in self.enemy_planes:
+                if x == e.x and y == e.y:
+                    dupe = True
+                    break
+
+            if dupe:
+                continue
+
+            print("Moving enemy")
+            enemy.x = x
+            enemy.y = y
+        print("Move failed")
+
     def game_loop(self):
         self.level_n = -1
         turn = 0
@@ -304,6 +362,7 @@ class Game:
                     missile.step()
                 self.check_hits()
                 self.check_level_win()
+                self.check_enemy_moves()
 
             self.check_spawn()
 
@@ -375,5 +434,6 @@ while True:
     try:
         game.run()
     except Exception as ex:
-        sys.exc_info()
+        print(ex)
+        print(repr(sys.exc_info()))
         #traceback.print_tb()
